@@ -11,6 +11,17 @@
   "navigation": {
     "tabs": [
       {
+        "tab": "大模型攻坚战",
+        "groups": [
+          {
+            "group": "LangChain",
+            "pages": [
+              "01"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Guides",
         "groups": [
           {
