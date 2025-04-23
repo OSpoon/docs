@@ -16,7 +16,7 @@
           {
             "group": "LangChain",
             "pages": [
-              "Introduction"
+              "langchain/introduction"
             ]
           }
         ]
