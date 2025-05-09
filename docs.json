@@ -18,6 +18,12 @@
             "pages": [
               "langchain/introduction"
             ]
+          },
+          {
+            "group": "MCP",
+            "pages": [
+              "mcp/mcp-use"
+            ]
           }
         ]
       }

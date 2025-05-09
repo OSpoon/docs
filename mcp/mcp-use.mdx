@@ -1,0 +1,131 @@
+---
+title: "mcp-use"
+description: "开发者能够实现将任何 MCP 服务器连接到与 LangChain 支持的 LLM 提供商，从而允许创建具有工具访问权限的自定义 Agent，而不需要依赖于特定应用程序的客户端。"
+---
+
+## 快速实现于 MCP 服务器交互
+
+
+
+### 创建并初始化项目
+
+```bash
+# 创建项目结构
+uv init mcp-use-sample && cd mcp-use-sample
+
+# 创建虚拟环境并激活
+uv venv && .venv\Scripts\activate
+
+# 添加核心依赖和LLM提供者
+uv add mcp-use langchain-openai 
+```
+
+### 案例：利用 playwright-mcp 检索博主信息
+
+#### 工作流程
+
+1. MCP Client 会在单独的进程中启动外部服务器；
+2. 服务器提供所有可使用的工具，如：在浏览器中操作搜索、点击等行为；
+3. MCP Agent 将可使用的工具发送个 LLM；
+4. LLM 决定调用服务器提供的具体工具，并返回一个JSON工具调用，由 MCP-Use 执行；
+5. 重复补充3-4，直到 Agent 决定任务处理完毕或达到 max_steps 限制；
+
+#### 编码流程
+
+1. 创建 MCP 客户端对象并配置 MCP 服务器
+2. 创建 LLM 对象（选择 Qwen3 作为推理模型）
+3. 创建 MCP Agent 对象（关联 LLM 对象和 MCP Client 对象）
+4. 通过自然语言描述，让 MCP Agent 执行的任务
+5. 关闭所有 MCP 会话
+
+```python
+import asyncio
+from langchain_openai import ChatOpenAI
+from mcp_use import MCPAgent, MCPClient
+
+
+async def main():
+
+    # 1️⃣ 创建 MCP 客户端对象并配置 MCP 服务器
+    client = MCPClient(
+        config={
+            "mcpServers": {
+                "playwright": {
+                    "command": "npx",
+                    "args": ["@playwright/mcp@latest"],
+                }
+            }
+        }
+    )
+    # 2️⃣ 创建 LLM 对象（选择 Qwen3 作为推理模型）
+    llm = ChatOpenAI(
+        model="qwen3-235b-a22b",
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        # https://bailian.console.aliyun.com/?tab=model#/api-key
+        api_key="your api key",  
+    )
+
+    # 3️⃣ 创建 MCP Agent 对象（关联 LLM 对象和 MCP Client 对象）
+    agent = MCPAgent(
+        llm=llm,
+        client=client,
+        max_steps=30,          # 最大执行步数
+        max_execution_time=60, # 最大执行时间
+        verbose=True,          # 打印详细信息
+    )
+
+    try:
+        # 4️⃣ 通过自然语言描述，让 MCP Agent 执行的任务
+        result = await agent.run("在稀土掘金详细了解一位名叫小鑫同学的博主")
+        print("\n🔥 Result:", result)
+    finally:
+        # 5️⃣ 关闭所有 MCP 会话
+        if client.sessions:
+            await client.close_all_sessions()
+        # 添加延迟，确保资源顺利释放完毕
+        await asyncio.sleep(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+运行上面的代码将看到 MCP-Use 启动 Playwright 服务器后让 LLM 自行驱动浏览器的操作行为，并在最后打印收集整理的答案：
+
+```txt
+🔥 Result: 小鑫同学是稀土掘金平台上一位活跃的前端技术博主，以下是他的详细信息：
+
+1. **技术领域**：
+   - 主攻**前端开发**，擅长Vue.js、TypeScript、JavaScript等技术栈
+   - 有混合开发经验（曾涉及Android开发）
+   - 涉猎Rust、NestJS等跨领域技术
+
+2. **创作成就**：
+   - 创作等级LV.5（最高级）
+   - 累计发表**238篇文章**，涵盖前端开发、Vue3实践、工具链配置等主题
+   - 参与**338个沸点讨论**，显示活跃的技术交流参与度
+   - 拥有**459位关注者**（掘友6级-杰出掘友）
+
+3. **个人背景**：
+   - 北京工作，拥有6年前端及跨平台开发经验
+   - InfoQ签约作者，曾获"杰出掘友"称号
+   - 个人简介显示为"前端高级裱糊匠 @OSPOON.cn"
+
+4. **典型文章方向**：
+   - Vue3技术实践（如拖拽功能实现）
+   - 前端工具链配置（Babel、tsup等）
+   - 技术趋势分析（如LogicFlow流程图框架）
+   - 跨平台开发经验分享
+
+5. **社区影响力**：
+   - 文章常被官方推荐（多次出现在掘金首页推荐栏目）
+   - 参与过创作者训练营等官方活动
+   - 在技术圈有一定号召力（单篇文章最高获得115点赞）
+
+您可以通过[他的个人主页](https://juejin.cn/user/3966693685871694)查看其最新技术分享和项目实践
+```
+
+PS：资源引用
+
+1. [playwright-mcp](https://github.com/microsoft/playwright-mcp)
+2. [Qwen3](https://bailian.console.aliyun.com/?tab=model#/model-market/detail/qwen3)
